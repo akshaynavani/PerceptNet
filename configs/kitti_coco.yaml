@@ -1,0 +1,25 @@
+# Fine-tune on KITTI (or BDD100K) exported to COCO format.
+data:
+  kind: coco
+  train_images: data/kitti/images/train
+  train_annotations: data/kitti/annotations/train.json
+  val_images: data/kitti/images/val
+  val_annotations: data/kitti/annotations/val.json
+  class_names: []          # read from the annotation file
+  input_size: [384, 1248]  # KITTI aspect ratio, divisible by 32
+  batch_size: 8
+  max_objects: 100
+model:
+  backbone: resnet34
+  dtype: bfloat16
+train:
+  epochs: 70
+  lr: 0.0005
+  warmup_steps: 1000
+  pretrained_backbone: weights/resnet34_imagenet.npz
+  freeze_backbone_steps: 2000
+  backbone_lr_mult: 0.1
+  output_dir: runs/kitti_r34
+inference:
+  score_threshold: 0.25
+  nms_iou_threshold: 0.5
