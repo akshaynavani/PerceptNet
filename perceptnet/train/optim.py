@@ -11,7 +11,6 @@
 
 from __future__ import annotations
 
-import jax
 import jax.numpy as jnp
 import optax
 from flax import traverse_util
@@ -69,4 +68,4 @@ def frozen_fraction(params) -> float:
     return bb / max(total, 1)
 
 
-__all__ = ["build_optimizer", "make_schedule", "param_groups", "decay_mask", "frozen_fraction", "jax"]
+__all__ = ["build_optimizer", "make_schedule", "param_groups", "decay_mask", "frozen_fraction"]
