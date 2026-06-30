@@ -56,6 +56,28 @@ class Timings:
         return out
 
 
+def postprocess_detections(
+    boxes: np.ndarray,
+    scores: np.ndarray,
+    classes: np.ndarray,
+    info: LetterboxInfo,
+    icfg,
+    score_threshold: float | None = None,
+) -> Detections:
+    """Host-side post-processing for one image's top-K decoded detections.
+
+    Score threshold -> optional class-aware NMS (C++ when built) -> map to original-frame pixels.
+    """
+    thr = icfg.score_threshold if score_threshold is None else score_threshold
+    keep = scores > thr
+    boxes, scores, classes = boxes[keep], scores[keep], classes[keep]
+    if icfg.use_nms and len(scores) > 1:
+        idx = cpp_ext.batched_nms(boxes, scores, classes, icfg.nms_iou_threshold, backend=icfg.backend)
+        boxes, scores, classes = boxes[idx], scores[idx], classes[idx]
+    boxes = boxes_to_original(boxes, info)
+    return Detections(boxes.astype(np.float32), scores.astype(np.float32), classes.astype(np.int32))
+
+
 class InferenceEngine:
     def __init__(
         self,
@@ -156,15 +178,7 @@ class InferenceEngine:
         self, boxes: np.ndarray, scores: np.ndarray, classes: np.ndarray, info: LetterboxInfo,
         score_threshold: float | None = None,
     ) -> Detections:
-        icfg = self.cfg.inference
-        thr = icfg.score_threshold if score_threshold is None else score_threshold
-        keep = scores > thr
-        boxes, scores, classes = boxes[keep], scores[keep], classes[keep]
-        if icfg.use_nms and len(scores) > 1:
-            idx = cpp_ext.batched_nms(boxes, scores, classes, icfg.nms_iou_threshold, backend=icfg.backend)
-            boxes, scores, classes = boxes[idx], scores[idx], classes[idx]
-        boxes = boxes_to_original(boxes, info)
-        return Detections(boxes.astype(np.float32), scores.astype(np.float32), classes.astype(np.int32))
+        return postprocess_detections(boxes, scores, classes, info, self.cfg.inference, score_threshold)
 
     def detect(self, frames_bgr: list[np.ndarray], score_threshold: float | None = None) -> list[Detections]:
         """End-to-end detection on raw BGR frames of any size."""
