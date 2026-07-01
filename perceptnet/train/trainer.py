@@ -15,6 +15,7 @@ import numpy as np
 from perceptnet.config import Config
 from perceptnet.data.dataset import build_dataset
 from perceptnet.data.loader import DataLoader
+from perceptnet.model.decode import decode
 from perceptnet.model.detector import build_model, count_params, init_variables
 from perceptnet.model.losses import centernet_loss
 from perceptnet.model.targets import CenterNetTargetEncoder
@@ -159,12 +160,26 @@ class Trainer:
         return {"params": self.state.params, "batch_stats": self.state.batch_stats}
 
     def evaluate(self) -> dict:
-        """Validation loss averaged over the val split."""
+        """Validation loss plus COCO-style mAP over the val split."""
+        from perceptnet.eval.evaluate import accumulate_batch
+        from perceptnet.eval.metrics import DetectionEvaluator
+
+        evaluator = DetectionEvaluator(self.cfg.data.num_classes, self.cfg.data.class_names)
         totals: dict[str, float] = {}
         n = 0
         for batch in self.val_loader:
-            _, metrics = eval_step(self.state, device_batch(batch), self.loss_cfg)
+            outputs, metrics = eval_step(self.state, device_batch(batch), self.loss_cfg)
+            boxes, scores, classes = decode(
+                outputs, top_k=self.cfg.inference.top_k, stride=self.cfg.model.output_stride
+            )
+            accumulate_batch(
+                evaluator, batch, np.asarray(boxes), np.asarray(scores), np.asarray(classes), self.cfg.inference
+            )
             for k, v in metrics.items():
                 totals[k] = totals.get(k, 0.0) + float(v)
             n += 1
-        return {f"val_{k}": v / max(n, 1) for k, v in totals.items()}
+        report = evaluator.compute()
+        (self.out_dir / "last_eval.json").write_text(json.dumps(report, indent=2))
+        result = {f"val_{k}": v / max(n, 1) for k, v in totals.items()}
+        result.update({"map": report["map"], "map50": report["map50"], "map75": report["map75"] or 0.0})
+        return result
