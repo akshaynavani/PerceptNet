@@ -116,12 +116,12 @@ def bench_matmul(sizes=(512, 1024, 2048), iters=20) -> list[TimingResult]:
 
 
 def run_all(quick: bool = False) -> list[TimingResult]:
-    it = 5 if quick else None
-    kw = (lambda d: {"iters": it} if it else {})
-    results = []
-    results += bench_iou(**kw(None))
-    results += bench_nms(sizes=(100, 1000) if quick else (100, 1000, 3000), **kw(None))
-    results += bench_preprocess(**kw(None))
-    results += bench_decode_ops(**kw(None))
-    results += bench_matmul(sizes=(512,) if quick else (512, 1024, 2048), **kw(None))
-    return results
+    if quick:
+        return (
+            bench_iou(sizes=(100,), iters=5)
+            + bench_nms(sizes=(100, 1000), iters=5)
+            + bench_preprocess(targets=((384, 640),), iters=5)
+            + bench_decode_ops(iters=5)
+            + bench_matmul(sizes=(512,), iters=5)
+        )
+    return bench_iou() + bench_nms() + bench_preprocess() + bench_decode_ops() + bench_matmul()
