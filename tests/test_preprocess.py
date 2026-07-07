@@ -20,7 +20,7 @@ def test_letterbox_shape_and_padding(hw):
     img = np.full((*hw, 3), 200, np.uint8)
     out, info = letterbox(img, (256, 384))
     assert out.shape == (256, 384, 3)
-    assert info.orig_h, info.orig_w == hw
+    assert (info.orig_h, info.orig_w) == hw
     # Padding (if any) uses the constant pad value.
     if info.pad_y >= 1:
         assert (out[0] == PAD_VALUE).all()
