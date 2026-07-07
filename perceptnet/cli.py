@@ -119,6 +119,54 @@ def cmd_export_hlo(args) -> int:
     return 0
 
 
+def cmd_eval(args) -> int:
+    from perceptnet.eval.evaluate import format_report, run_evaluation
+
+    cfg = load_config(args.config, args.overrides)
+    report = run_evaluation(cfg, args.checkpoint, split=args.split, out=args.out)
+    print(format_report(report))
+    return 0
+
+
+def cmd_bench(args) -> int:
+    from pathlib import Path
+
+    from perceptnet.bench.timing import format_table
+
+    results, extra = [], {}
+    if args.suite in ("ops", "all"):
+        from perceptnet.bench.ops_bench import run_all
+
+        results += run_all(quick=args.quick)
+    if args.suite in ("latency", "all"):
+        from perceptnet.bench.latency_bench import bench_latency
+        from perceptnet.train.checkpoint import load_inference_variables
+
+        cfg = load_config(args.config, args.overrides)
+        variables = load_inference_variables(args.checkpoint) if args.checkpoint else None
+        batch_sizes = tuple(int(b) for b in args.batch_sizes.split(","))
+        rows, summary = bench_latency(
+            cfg, variables, batch_sizes, iters=5 if args.quick else 30, include_eager=not args.no_eager
+        )
+        results += rows
+        extra["latency_summary"] = summary
+    print(format_table(results))
+    if extra.get("latency_summary"):
+        print(json.dumps(extra["latency_summary"], indent=2))
+    if args.out:
+        import jax
+
+        Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "jax_backend": jax.default_backend(),
+            "devices": [str(d) for d in jax.devices()],
+            "results": [r.row() for r in results],
+            **extra,
+        }
+        Path(args.out).write_text(json.dumps(payload, indent=2))
+    return 0
+
+
 def cmd_export_synthetic(args) -> int:
     from perceptnet.data.synthetic import SyntheticShapes, export_coco
 
@@ -146,6 +194,23 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--max-frames", type=int, default=0)
     p.add_argument("--show", action="store_true", help="display frames in a window")
     p.set_defaults(func=cmd_infer)
+
+    p = sub.add_parser("eval", help="evaluate mAP and P/R/F1 across score thresholds")
+    _add_config_args(p)
+    p.add_argument("--checkpoint", required=True)
+    p.add_argument("--split", default="val", choices=["train", "val"])
+    p.add_argument("--out", default="outputs/eval.json")
+    p.set_defaults(func=cmd_eval)
+
+    p = sub.add_parser("bench", help="benchmark numeric ops and end-to-end latency")
+    _add_config_args(p)
+    p.add_argument("--suite", default="all", choices=["ops", "latency", "all"])
+    p.add_argument("--checkpoint", default=None, help="optional weights for the latency suite")
+    p.add_argument("--batch-sizes", default="1,4,8")
+    p.add_argument("--quick", action="store_true", help="fewer sizes and iterations")
+    p.add_argument("--no-eager", action="store_true", help="skip the slow eager baseline")
+    p.add_argument("--out", default="outputs/bench.json")
+    p.set_defaults(func=cmd_bench)
 
     p = sub.add_parser("export-hlo", help="dump StableHLO / optimized HLO of the inference graph")
     _add_config_args(p)
