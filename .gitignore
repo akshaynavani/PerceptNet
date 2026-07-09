@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+.python-version
+
+# C++ / CMake build output
+cmake-build-*/
+CMakeCache.txt
+CMakeFiles/
+compile_commands.json
+*.o
+*.a
+*.so
+*.dylib
+*.pyd
+
+# Data, weights and run artifacts
+data/
+weights/
+runs/
+outputs/
+*.msgpack
+*.npz
+*.safetensors
+*.mp4
+
+# JAX / XLA dumps
+xla_dump/
+*.hlo.txt
+*.mlir
+
+# IDE / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
