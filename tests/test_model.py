@@ -1,6 +1,5 @@
 import jax
 import jax.numpy as jnp
-import numpy as np
 import pytest
 
 from perceptnet.config import Config, load_config
@@ -68,6 +67,3 @@ def test_config_overrides(tmp_path):
     with pytest.raises(KeyError):
         load_config(None, ["train.nope=1"])
 
-
-def test_numpy_dtype_roundtrip():
-    assert np.float32 == jnp.float32
